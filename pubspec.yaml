@@ -1,24 +1,26 @@
-name: facelivenessdetection
+name: face_liveness_detection_plus
 description: "A real-time facial verification feature using Google ML Kit for
   liveliness detection."
-version: 1.1.14
-homepage: https://github.com/RoshanKarki007/facelivenessdetection
+version: 1.2.0
+homepage: https://github.com/rizkyghofur/face_liveness_detection_plus
 
 environment:
   sdk: ^3.6.0
   flutter: ">=1.17.0"
 
 dependencies:
-  camera: ^0.10.6
+  camera: ^0.12.0+2
   camera_android: ^0.10.10
-  camera_avfoundation: ^0.9.18+4
+  camera_avfoundation: ^0.10.2
   flutter:
     sdk: flutter
-  google_mlkit_commons: ^0.9.0
-  google_mlkit_face_detection: ^0.12.0
+  google_mlkit_commons: ^0.12.0
+  google_mlkit_face_detection: ^0.14.0
+  path_provider: ^2.1.4
+  path: ^1.9.0
 
 dev_dependencies:
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
 

@@ -1,5 +1,5 @@
 import 'package:camera/camera.dart';
-import 'package:facelivenessdetection/src/camera_view/camera_view.dart';
+import 'package:face_liveness_detection_plus/src/camera_view/camera_view.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 

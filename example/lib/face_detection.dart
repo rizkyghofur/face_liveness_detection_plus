@@ -1,6 +1,6 @@
 import 'dart:developer';
 
-import 'package:facelivenessdetection/facelivenessdetection.dart';
+import 'package:face_liveness_detection_plus/face_liveness_detection_plus.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -92,10 +92,11 @@ class __FaceDetectorState extends State<_FaceDetector> {
                   ]
                 ],
               ),
-          onRulesetCompleted: (ruleset) {
+          onRulesetCompleted: (ruleset, imageUrl) {
             if (!_completedRuleset.contains(ruleset)) {
               _completedRuleset.add(ruleset);
             }
+            log('Ruleset completed: $ruleset, Image URL: $imageUrl', name: 'RulesetCompletion');
           }),
     );
   }

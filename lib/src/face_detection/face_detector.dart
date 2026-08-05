@@ -1,12 +1,15 @@
 import 'dart:developer' as dev;
 import 'dart:io';
 import 'package:camera/camera.dart';
-import 'package:facelivenessdetection/src/debouncer/debouncer.dart';
-import 'package:facelivenessdetection/src/detector_view/detector_view.dart';
-import 'package:facelivenessdetection/src/painter/dotted_painter.dart';
-import 'package:facelivenessdetection/src/rule_set/rule_set.dart';
+import 'package:face_liveness_detection_plus/src/debouncer/debouncer.dart';
+import 'package:face_liveness_detection_plus/src/detector_view/detector_view.dart';
+import 'package:face_liveness_detection_plus/src/painter/dotted_painter.dart';
+import 'package:face_liveness_detection_plus/src/rule_set/rule_set.dart';
+import 'package:face_liveness_detection_plus/src/face_capture/face_capture_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
@@ -14,10 +17,12 @@ class FaceDetectorView extends StatefulWidget {
   final int pauseDurationInSeconds;
   final Size cameraSize;
   final Function(bool validated)? onSuccessValidation;
-  final void Function(Rulesets ruleset)? onRulesetCompleted;
+  final void Function(Rulesets ruleset, String? imageUrl)? onRulesetCompleted;
   final List<Rulesets> ruleset;
   final Color activeProgressColor;
   final Color progressColor;
+  final bool autoCapture;
+  final FaceCaptureController? controller;
 
   final Widget Function(
       {required Rulesets state,
@@ -32,6 +37,7 @@ class FaceDetectorView extends StatefulWidget {
       {super.key,
       required this.onRulesetCompleted,
       required this.onValidationDone,
+      this.controller,
       this.ruleset = const [
         Rulesets.smiling,
         Rulesets.blink,
@@ -49,7 +55,8 @@ class FaceDetectorView extends StatefulWidget {
       this.backgroundColor = Colors.white,
       this.contextPadding,
       this.cameraSize = const Size(200, 200),
-      this.pauseDurationInSeconds = 5})
+      this.pauseDurationInSeconds = 5,
+      this.autoCapture = true})
       : assert(ruleset.length != 0, 'Ruleset cannot be empty');
 
   @override
@@ -74,6 +81,33 @@ class _FaceDetectorViewState extends State<FaceDetectorView> {
   Debouncer? _debouncer;
   CameraController? controller;
   bool hasFace = false;
+  bool _paused = false;
+  final List<FaceCaptureResult> _results = [];
+  Face? _lastFace;
+  late final List<Rulesets> _initialRules;
+
+  /// Captures an image from the camera and saves it to temporary storage
+  Future<String?> _captureImage() async {
+    if (controller == null || !controller!.value.isInitialized) {
+      return null;
+    }
+
+    try {
+      final XFile imageFile = await controller!.takePicture();
+      final Directory tempDir = await getTemporaryDirectory();
+      final String fileName = 'face_capture_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final String filePath = path.join(tempDir.path, fileName);
+      
+      // Copy the image to our desired location
+      await imageFile.saveTo(filePath);
+      
+      return filePath;
+    } catch (e) {
+      dev.log('Error capturing image: $e', name: 'ImageCapture');
+      return null;
+    }
+  }
+
   @override
   void dispose() {
     _canProcess = false;
@@ -84,13 +118,52 @@ class _FaceDetectorViewState extends State<FaceDetectorView> {
 
   @override
   void initState() {
-    ruleset.value = widget.ruleset.toList();
+    _initialRules = widget.ruleset.toList();
+    ruleset.value = _initialRules.toList();
     _currentTest = ValueNotifier<Rulesets?>(ruleset.value.first);
     _debouncer = Debouncer(
         durationInSeconds: widget.pauseDurationInSeconds,
         onComplete: () =>
             dev.log('Timer is completed', name: 'Photo verification timer'));
     _debouncer?.start();
+
+    widget.controller?.bind(
+      onCapture: (Rulesets? rule) async {
+        if (_lastFace == null) {
+          throw StateError('No face detected. Please ensure a face is visible before capturing.');
+        }
+        final Rulesets effectiveRule = rule ?? _currentTest.value ?? ruleset.value.first;
+        final double accuracy = _computeAccuracy(effectiveRule, _lastFace!);
+        final String? imageUrl = await _captureImage();
+        final result = FaceCaptureResult(
+            rule: effectiveRule, imageUrl: imageUrl, accuracyPercentage: accuracy);
+        _results.add(result);
+        return result;
+      },
+      onReset: () {
+        _debouncer?.stop();
+        _paused = false;
+        _results.clear();
+        _lastFace = null;
+        ruleset.value = _initialRules.toList();
+        _currentTest.value = ruleset.value.first;
+        _debouncer?.start();
+        setState(() {});
+      },
+      onPause: () {
+        _paused = true;
+        _debouncer?.stop();
+        setState(() {});
+      },
+      onContinue: () {
+        _paused = false;
+        if (widget.autoCapture && ruleset.value.isNotEmpty) {
+          _debouncer?.start();
+        }
+        setState(() {});
+      },
+      onGetImages: () => _results.toList(),
+    );
 
     super.initState();
   }
@@ -180,7 +253,13 @@ class _FaceDetectorViewState extends State<FaceDetectorView> {
     });
     final faces = await _faceDetector.processImage(inputImage);
     hasFace = faces.isNotEmpty;
-    if (!(_debouncer?.isRunning ?? false)) handleRuleSet(faces);
+    _lastFace = faces.isNotEmpty ? faces.first : null;
+    
+    // Process rules regardless of autoCapture, but only auto-capture when enabled
+    if (!_paused && !(_debouncer?.isRunning ?? false)) {
+      handleRuleSet(faces);
+    }
+
     if (inputImage.metadata?.size != null &&
         inputImage.metadata?.rotation != null) {
     } else {
@@ -203,7 +282,7 @@ class _FaceDetectorViewState extends State<FaceDetectorView> {
     }
   }
 
-  startRandomizedTime(Face face) {
+  Future<void> startRandomizedTime(Face face) async {
     if (ruleset.value.isEmpty) {
       widget.onSuccessValidation?.call(true);
       return;
@@ -236,9 +315,21 @@ class _FaceDetectorViewState extends State<FaceDetectorView> {
     if (!isDetected) {
       ruleset.value.insert(0, currentRuleset);
     } else {
+      // Only auto-capture when autoCapture is enabled
+      if (widget.autoCapture) {
+        String? imageUrl = await _captureImage();
+        final double accuracy = _computeAccuracy(currentRuleset, face);
+        _results.add(FaceCaptureResult(
+            rule: currentRuleset, imageUrl: imageUrl, accuracyPercentage: accuracy));
+        // Call the callback with both ruleset and image URL
+        widget.onRulesetCompleted?.call(currentRuleset, imageUrl);
+      }
+      
       if (ruleset.value.isNotEmpty) {
         _currentTest.value = ruleset.value.first;
-        _debouncer?.start();
+        if (widget.autoCapture) {
+          _debouncer?.start();
+        }
       } else {
         _currentTest.value = null;
         _debouncer?.stop();
@@ -262,13 +353,10 @@ class _FaceDetectorViewState extends State<FaceDetectorView> {
     if (!up) {
       dev.log(rotX.toString(), name: 'Head Movement');
       if (rotX < -20) {
-        // Adjust threshold if needed
-        widget.onRulesetCompleted?.call(Rulesets.tiltUp);
         return true;
       }
     } else {
       if (rotX > 20) {
-        widget.onRulesetCompleted?.call(Rulesets.tiltUp);
         return true;
       }
     }
@@ -291,12 +379,10 @@ class _FaceDetectorViewState extends State<FaceDetectorView> {
 
     if (left) {
       if (adjustedRotY < -40) {
-        widget.onRulesetCompleted?.call(Rulesets.toLeft);
         return true;
       }
     } else {
       if (adjustedRotY > 40) {
-        widget.onRulesetCompleted?.call(Rulesets.toRight);
         return true;
       }
     }
@@ -310,7 +396,6 @@ class _FaceDetectorViewState extends State<FaceDetectorView> {
     if (leftEyeOpenProb != null && rightEyeOpenProb != null) {
       if (leftEyeOpenProb < eyeOpenThreshold &&
           rightEyeOpenProb < eyeOpenThreshold) {
-        widget.onRulesetCompleted?.call(Rulesets.blink);
         return true;
       }
     }
@@ -321,12 +406,32 @@ class _FaceDetectorViewState extends State<FaceDetectorView> {
     if (face.smilingProbability != null) {
       final double? smileProb = face.smilingProbability;
       if ((smileProb ?? 0) > .5) {
-        if (widget.onRulesetCompleted != null) {
-          widget.onRulesetCompleted!(Rulesets.smiling);
-          return true;
-        }
+        return true;
       }
     }
     return false;
+  }
+
+  double _computeAccuracy(Rulesets rule, Face face) {
+    switch (rule) {
+      case Rulesets.smiling:
+        return ((face.smilingProbability ?? 0.0) * 100).clamp(0.0, 100.0);
+      case Rulesets.blink:
+        final left = 1.0 - (face.leftEyeOpenProbability ?? 1.0);
+        final right = 1.0 - (face.rightEyeOpenProbability ?? 1.0);
+        return (((left + right) / 2) * 100).clamp(0.0, 100.0);
+      case Rulesets.tiltUp:
+        final rotX = face.headEulerAngleX ?? 0.0;
+        return (rotX <= 0) ? 0 : (rotX / 30.0 * 100).clamp(0.0, 100.0);
+      case Rulesets.tiltDown:
+        final rotX = face.headEulerAngleX ?? 0.0;
+        return (rotX >= 0) ? 0 : (-rotX / 30.0 * 100).clamp(0.0, 100.0);
+      case Rulesets.toLeft:
+        final rotY = Platform.isIOS ? -(face.headEulerAngleY ?? 0.0) : (face.headEulerAngleY ?? 0.0);
+        return (rotY >= 0) ? 0 : (-rotY / 50.0 * 100).clamp(0.0, 100.0);
+      case Rulesets.toRight:
+        final rotY = Platform.isIOS ? -(face.headEulerAngleY ?? 0.0) : (face.headEulerAngleY ?? 0.0);
+        return (rotY <= 0) ? 0 : (rotY / 50.0 * 100).clamp(0.0, 100.0);
+    }
   }
 }
