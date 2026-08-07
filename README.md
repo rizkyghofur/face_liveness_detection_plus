@@ -28,15 +28,34 @@ Run `flutter pub get` to install the package.
 
 ## Platform Setup
 
+### Android
+
+1. **minSdkVersion**: Ensure your `android/app/build.gradle` has `minSdkVersion` set to at least `21`:
+
+```groovy
+android {
+    defaultConfig {
+        minSdkVersion 21
+    }
+}
+```
+
+2. **Camera Permissions**: Add camera permission to `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
+```
+
 ### iOS
 
-Set your global platform target in `ios/Podfile`:
+1. **Podfile Platform**: Set your global platform target in `ios/Podfile` to iOS `15.5` or higher:
 
 ```ruby
 platform :ios, '15.5'
 ```
 
-Add camera and microphone permission descriptions to `ios/Runner/Info.plist`:
+2. **Permissions**: Add camera and microphone permission descriptions to `ios/Runner/Info.plist`:
 
 ```xml
 <key>NSCameraUsageDescription</key>
@@ -157,6 +176,69 @@ FaceDetectorView(
       child: const Text('Capture Image'),
     );
   },
+)
+```
+
+### Advanced Options & Configuration
+
+You can customize detector options, sensitivity thresholds, localized texts, overlay masks, and event listeners:
+
+```dart
+FaceDetectorView(
+  // Configure ML Kit performance mode (fast vs accurate)
+  performanceMode: FaceDetectorMode.fast,
+
+  // Enable dimmed oval background mask
+  enableDimmedOverlay: true,
+  overlayDimColor: Colors.black.withOpacity(0.5),
+
+  // Enable/disable haptic feedback on rule completion
+  enableHapticFeedback: true,
+
+  // Randomize verification ruleset order (anti-spoofing)
+  randomizeRuleset: true,
+
+  // Custom sensitivity thresholds
+  thresholds: const LivenessThresholds(
+    smileThreshold: 0.6,
+    blinkThreshold: 0.5,
+    headTiltUpThreshold: 15.0,
+    headTiltDownThreshold: -15.0,
+    headTurnLeftThreshold: 25.0,
+    headTurnRightThreshold: -25.0,
+    minFaceRatio: 0.15,
+    maxFaceRatio: 0.70,
+    lowLightThreshold: 40.0,
+  ),
+
+  // Custom localization strings
+  localization: const LivenessLocalization(
+    smileInstruction: 'Please smile',
+    blinkInstruction: 'Please blink your eyes',
+    turnLeftInstruction: 'Please turn your head left',
+    turnRightInstruction: 'Please turn your head right',
+    tooCloseText: 'Move further away',
+    tooFarText: 'Move closer to the camera',
+    lowLightText: 'Lighting is too dark',
+  ),
+
+  // Event Listeners
+  onRuleChanged: (currentRule) {
+    print('Current active rule: $currentRule');
+  },
+  onFacePositionStatusChanged: (status) {
+    // FacePositionStatus: normal, tooClose, tooFar, multipleFaces
+    print('Face status: $status');
+  },
+  onLowLightDetected: (isLowLight) {
+    print('Is ambient light low: $isLowLight');
+  },
+  onCameraError: (error) {
+    print('Camera initialization error: $error');
+  },
+  onRulesetCompleted: (rule, imageUrl) {},
+  onValidationDone: (controller) => Container(),
+  child: ({required countdown, required state, required hasFace}) => Container(),
 )
 ```
 
