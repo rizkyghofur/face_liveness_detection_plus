@@ -45,10 +45,11 @@ Add camera and microphone permission descriptions to `ios/Runner/Info.plist`:
 <string>Microphone access is required for video recording during verification.</string>
 ```
 
-## Preview
-
-![image](https://github.com/user-attachments/assets/eb0ca715-27f8-4aa5-9e23-fd11825e8960)
-![image](https://github.com/user-attachments/assets/5f6729b3-8ec8-4d2a-b728-bcbb299379ae)
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/eb0ca715-27f8-4aa5-9e23-fd11825e8960" width="45%" />
+  &nbsp;
+  <img src="https://github.com/user-attachments/assets/5f6729b3-8ec8-4d2a-b728-bcbb299379ae" width="45%" />
+</p>
 
 ## Usage Example
 
