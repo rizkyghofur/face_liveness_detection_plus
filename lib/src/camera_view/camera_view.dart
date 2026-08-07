@@ -1,8 +1,9 @@
 import 'dart:io';
-import 'package:google_mlkit_commons/google_mlkit_commons.dart';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_mlkit_commons/google_mlkit_commons.dart';
 
 class CameraView extends StatefulWidget {
   const CameraView({
@@ -14,8 +15,12 @@ class CameraView extends StatefulWidget {
     this.initialCameraLensDirection = CameraLensDirection.back,
     this.onController,
     this.cameraSize = const Size(200, 200),
+    this.resolutionPreset = ResolutionPreset.high,
+    this.onCameraError,
   });
   final Size cameraSize;
+  final ResolutionPreset resolutionPreset;
+  final Function(Object error)? onCameraError;
   final Function(InputImage inputImage) onImage;
   final VoidCallback? onCameraFeedReady;
   final VoidCallback? onDetectorViewModeChanged;
@@ -94,7 +99,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   Future _startLiveFeed() async {
     try {
       final camera = _cameras[_cameraIndex];
-      _controller = CameraController(camera, ResolutionPreset.high,
+      _controller = CameraController(camera, widget.resolutionPreset,
           enableAudio: false,
           imageFormatGroup: Platform.isAndroid
               ? ImageFormatGroup.nv21
@@ -112,9 +117,12 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
           }
         });
         setState(() {});
+      }).catchError((error) {
+        widget.onCameraError?.call(error);
       });
     } catch (ex) {
       debugPrint('Camera error: $ex');
+      widget.onCameraError?.call(ex);
     }
   }
 
@@ -166,9 +174,14 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   }
 
   void _processCameraImage(CameraImage image) {
-    final inputImage = _inputImageFromCameraImage(image);
-    if (inputImage == null) return;
-    widget.onImage(inputImage);
+    if (!mounted || _controller == null) return;
+    try {
+      final inputImage = _inputImageFromCameraImage(image);
+      if (inputImage == null) return;
+      widget.onImage(inputImage);
+    } catch (e) {
+      debugPrint('Error processing camera frame: $e');
+    }
   }
 
   final _orientations = {

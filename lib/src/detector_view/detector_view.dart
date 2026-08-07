@@ -14,8 +14,12 @@ class DetectorView extends StatefulWidget {
     this.onCameraLensDirectionChanged,
     this.onController,
     this.cameraSize = const Size(200, 200),
+    this.resolutionPreset = ResolutionPreset.high,
+    this.onCameraError,
   });
   final Size cameraSize;
+  final ResolutionPreset resolutionPreset;
+  final Function(Object error)? onCameraError;
   final String title;
 
   final String? text;
@@ -34,6 +38,8 @@ class _DetectorViewState extends State<DetectorView> {
   Widget build(BuildContext context) {
     return CameraView(
       cameraSize: widget.cameraSize,
+      resolutionPreset: widget.resolutionPreset,
+      onCameraError: widget.onCameraError,
       onController: widget.onController,
       onImage: (image) {
         widget.onImage.call(image);
