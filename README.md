@@ -4,7 +4,11 @@ A real-time facial verification package for Flutter using Google ML Kit for live
 
 ## Features
 
-- **Real-Time Detection**: Fast and accurate face detection powered by Google ML Kit.
+- **Real-Time Detection**: Fast and accurate face detection powered by Google ML Kit with configurable `performanceMode` (`fast` or `accurate`).
+- **Configurable Thresholds**: Customize sensitivity thresholds for smiling, blinking, and head movements via `LivenessThresholds`.
+- **Localization & Instructions**: Easily customize or translate instruction texts via `LivenessLocalization`.
+- **Custom UI Overlay**: Replace default dotted border with custom `customOverlayBuilder`.
+- **Liveness Controller**: Isolated logic and state controller `LivenessDetectionController` for testing and custom UI integration.
 - **Dynamic Feedback**: Real-time visual UI feedback for each verification rule.
 - **Animated Transitions**: Smooth progress animations during rule evaluation.
 - **Countdown Timer**: Built-in countdown timer before verification completes.
@@ -152,6 +156,10 @@ FaceDetectorView(
   },
 )
 ```
+
+## Credits
+
+This package is based on and inspired by the original work of [Roshan Karki](https://github.com/RoshanKarki007) ([facelivenessdetection](https://github.com/RoshanKarki007/facelivenessdetection)). Special thanks for the core implementation of Flutter face liveness detection.
 
 ## License
 
